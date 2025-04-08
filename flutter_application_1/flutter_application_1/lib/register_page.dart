@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_page.dart';
+import 'package:web3dart/web3dart.dart' show bytesToHex;
+import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+String generatePrivateKey() {
+  final rng = Random.secure();
+  final privateKeyBytes = List<int>.generate(32, (_) => rng.nextInt(256));
+  final privateKeyHex = bytesToHex(privateKeyBytes, include0x: true);
+  return privateKeyHex;
+}
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,21 +24,31 @@ class _RegisterPageState extends State<RegisterPage> {
   final passwordController = TextEditingController();
 
   void register() async {
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur : ${e.toString()}")),
-      );
-    }
+  try {
+    // Crée un utilisateur avec Firebase Auth
+    UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
+
+    // Ajoute des informations supplémentaires dans Firestore
+    await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+      'email': emailController.text.trim(),
+      'createdAt': DateTime.now(),
+      'privateKey': generatePrivateKey(), // Exemple d'ajout de clé privée
+    });
+
+    // Redirige vers la page d'accueil
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Erreur : ${e.toString()}")),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
